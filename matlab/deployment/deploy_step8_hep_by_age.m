@@ -16,8 +16,7 @@
 % the bands only become less far away, and the trend is an extrapolation toward
 % a target outside the range rather than a convergence onto one inside it. The
 % result therefore supports "agreement increases with age across 5-22" directly,
-% and "the HEP matures toward the adult form" only by extension. The figure
-% marks the validated cohort as off-scale so the gap is not read away.
+% and "the HEP matures toward the adult form" only by extension.
 %
 % THE CONFOUND THAT WOULD FAKE THIS RESULT, AND HOW IT IS HANDLED.
 % Correlation with a reference is attenuated by measurement noise. If the older
@@ -44,10 +43,10 @@
 %              dividing out each group's measurement noise. This is the
 %              quantity that speaks to morphology.
 %
-% Reading the figure: if r_obs rises with age while r_corr stays flat, the
+% Reading the result: if r_obs rises with age while r_corr stays flat, the
 % gradient is measurement quality and the prediction is NOT supported. If
-% r_corr rises too, the morphology itself is converging. The figure is built to
-% make that distinction visible rather than to confirm the prediction.
+% r_corr rises too, the morphology itself is converging. All three are reported
+% to make that distinction visible rather than to confirm the prediction.
 %
 % This does not make the comparison airtight. Attenuation correction assumes the
 % noise is independent of the signal and that split-half reliability estimates
@@ -58,14 +57,13 @@
 % Inputs:  outputs/deployment/<dataset>/deploy_step7_group_hep\erp_cache.mat   (per-subject ERPs, from a7 pass 1)
 %          outputs/deployment/<dataset>/deploy_step7_group_hep\hep_group.mat   (primaryChans, refW, refAll, from a7 pass 2)
 %          toolbox_qc_with_demographics.csv     (age per recording)
-% Outputs: outputs/deployment/<dataset>/deploy_step8_hep_by_age\fig_hep_by_age.{png,pdf,emf,fig}
-%          outputs/deployment/<dataset>/deploy_step8_hep_by_age\panel_*.{png,pdf,emf,fig}
-%          outputs/deployment/<dataset>/deploy_step8_hep_by_age\hep_by_age.mat
+% Outputs: outputs/deployment/<dataset>/deploy_step8_hep_by_age\hep_by_age.mat
 %          outputs/deployment/<dataset>/deploy_step8_hep_by_age\hep_by_age.csv   (the per-band table)
+% Fig. 5 is drawn from hep_by_age.mat by python/fig_hep_by_age.py.
 %
 % RUN deploy_step7_group_hep FIRST. This script reads its two .mat outputs and computes
 % nothing from the raw epochs, so it takes seconds. If hep_group.mat predates
-% the addition of hep.refAll / hep.semRef, re-run a7 (its pass 1 cache is kept,
+% the addition of hep.refAll, re-run a7 (its pass 1 cache is kept,
 % so only the fast pass 2 repeats).
 
 %% CONFIG
@@ -134,8 +132,6 @@ nSplit = 200;
 
 rng(42,'twister');    % reproducible bootstrap and splits
 
-S = fig_style();
-
 %% LOAD
 fprintf('Loading a7 outputs...\n');
 cacheFile = fullfile(a7Path,'erp_cache.mat');
@@ -157,9 +153,6 @@ haveRefAll = isfield(hep,'refAll') && ~isempty(hep.refAll);
 assert(haveRefAll || (isfield(hep,'relRef') && ~isempty(hep.relRef)), ['hep has neither the ' ...
     'per-subject validated ERPs (refAll) nor the shipped reference reliability (relRef). ' ...
     'Re-run deploy_step7_group_hep (pass 1 is cached, so this is quick).']);
-
-semRef = [];
-if isfield(hep,'semRef'); semRef = hep.semRef; end
 
 hepIdx = find(times >= hepWindow(1) & times <= hepWindow(2));
 fprintf('  %d channels in the a priori set, %s\n', numel(primaryChans), hep.primarySrc);
@@ -329,58 +322,6 @@ if any([res.rCorr] > 1)
              'are measured. Report the observed r alongside it.\n'], sum([res.rCorr] > 1));
 end
 
-%% FIGURE
-cols = age_colors(nBand);
-
-% Three panels rather than two. The whole-cohort average used to be drawn over
-% the age family, where a curve heavy enough to read as an aggregate sat on top
-% of the seven curves the panel exists to show. It now has its own axes, which
-% also lets it carry a standard-error band and its own correlation.
-%
-% Order is aggregate, then resolved by age, then quantified: the whole cohort
-% establishes that a validated-looking response is there at all, the bands break
-% that claim apart, and the similarity panel measures what the bands show.
-%
-% Two rows rather than three across. The three-across version fitted a page but
-% gave each panel about 2.2 inches, which is too little for thirteen hairline
-% waveforms to be told apart - the thing the figure exists to show. Stacking
-% buys roughly a 40% width increase for (b) and (c) and lets (a), which carries
-% no per-band detail, sit above them at a readable aspect ratio rather than
-% being stretched across the full page.
-%
-% (a) is centred at about 60% width rather than spanning the row. Full width
-% would make it nearly 3:1, which flattens an ERP trace; the symmetric margins
-% read as deliberate where an off-centre panel would not.
-%
-% (b) is set narrower than the gap to (c) suggests, because its colorbar, tick
-% labels and rotated axis label all sit outside the axes box and would otherwise
-% run into (c)'s y-label.
-f = new_fig(S, 7.1, 6.5);
-axA = axes(f, 'Position', [0.215 0.620 0.585 0.330]);
-axB = axes(f, 'Position', [0.088 0.085 0.340 0.395]);
-axC = axes(f, 'Position', [0.640 0.085 0.330 0.395]);
-
-panel_cohort_compare(axA, S, times, wAll, semAll, nAll, refW, semRef, refN, ...
-                     rAll, hepWindow, numel(primaryChans));
-panel_age_waves(axB, S, times, res, cols, refW, semRef, refN, ...
-                hepWindow, bandLabel);
-panel_age_similarity(axC, S, res, cols, rhoObs, pObs);
-
-panel_letter(axA, S, 'a');
-panel_letter(axB, S, 'b');
-panel_letter(axC, S, 'c');
-
-export_all(f, outPath, 'fig_hep_by_age');
-
-standalone(S, outPath, 'panel_cohort_compare', 4.2, 3.5, @(ax) ...
-    panel_cohort_compare(ax, S, times, wAll, semAll, nAll, refW, semRef, refN, ...
-                         rAll, hepWindow, numel(primaryChans)));
-standalone(S, outPath, 'panel_age_waves', 5.0, 3.5, @(ax) ...
-    panel_age_waves(ax, S, times, res, cols, refW, semRef, refN, ...
-                    hepWindow, bandLabel));
-standalone(S, outPath, 'panel_age_similarity', 3.8, 3.5, @(ax) ...
-    panel_age_similarity(ax, S, res, cols, rhoObs, pObs));
-
 %% SAVE
 byAge = struct();
 byAge.res         = res;
@@ -406,239 +347,7 @@ tbl = table({res.label}', [res.n]', [res.ageMean]', [res.r]', [res.rLo]', ...
 writetable(tbl, fullfile(outPath,'hep_by_age.csv'));
 
 fprintf('\nWritten to %s\n', outPath);
-fprintf('  fig_hep_by_age.{png,pdf,emf,fig}\n');
-fprintf('  panel_age_waves / panel_age_similarity (standalone, for PowerPoint)\n');
 fprintf('  hep_by_age.mat, hep_by_age.csv\n');
-
-%% ================================ PANELS ================================
-
-function panel_age_waves(ax, S, times, res, cols, refW, semRef, refN, ...
-                         hepWindow, bandLabel)
-    % Every age band's HEP on one pair of axes, against the validated cohort.
-    % Overlaid rather than stacked: the question is whether the shapes
-    % converge, and an offset display answers it only by eye.
-    %
-    % The whole-cohort average is deliberately NOT here. It is an aggregate of
-    % these same curves, so it has to be drawn heavily enough to read as one,
-    % and at that weight it covers the family it summarises. It has its own
-    % panel instead.
-    axes(ax); hold(ax,'on');
-    t = times*1000;
-    nBand = numel(res);
-
-    % Y-limits from the DATA, computed here and applied at the end.
-    %
-    % The previous version sized the shading patch to the data plus 30%, then
-    % called axis tight, which fitted the axes to the PATCH, then padded that
-    % again. The padding compounded and the axis ran well past the waveforms -
-    % curves reaching -5 sat in a panel scaled to -7. The patch is now given a
-    % deliberately huge vertical extent and clipped by the axes, so it still
-    % fills the panel but its height no longer feeds back into the limits.
-    allY = refW(:);
-    if ~isempty(semRef)
-        allY = [allY; refW(:)-semRef(:); refW(:)+semRef(:)];  %#ok<AGROW>
-    end
-    for b = 1:nBand; allY = [allY; res(b).w(:)]; end          %#ok<AGROW>
-    allY = allY(isfinite(allY));
-    yLo = min(allY); yHi = max(allY);
-    % Headroom at the top only, for the legend; the bottom sits close to the
-    % deepest trough, which is what "fills the plot" means here.
-    yl = [yLo yHi] + [-0.04 0.15]*(yHi - yLo);
-
-    patch(ax, hepWindow([1 2 2 1])*1000, 1e4*[-1 -1 1 1], ...
-          S.cShade, 'EdgeColor','none', 'FaceAlpha',0.55);
-
-    % Validated cohort first and with its SEM, so the band curves read against
-    % it. n = 14 against hundreds per band: without the band the reader would
-    % take that curve as being as well determined as the coloured ones.
-    if ~isempty(semRef)
-        band(ax, t, refW, semRef, S.cRef, 0.18);
-    end
-
-    % Hairlines. Thirteen curves run close together for most of the epoch, and
-    % stroke width is what decides whether they resolve: at 0.9 pt neighbouring
-    % bands merge into a ribbon, at 0.5 pt they stay separate. This is below the
-    % usual floor for a print line, which is deliberate - the curves are read as
-    % a family rather than followed one at a time, and the figure goes out as
-    % vector, so there is no raster minimum to respect.
-    %
-    % The reference is heavier but no longer massively so: against 0.5 pt
-    % hairlines a 2.4 pt dashed curve dominates the panel it is supposed to be
-    % the backdrop for.
-    for b = 1:nBand
-        plot(ax, t, res(b).w, '-', 'Color', cols(b,:), 'LineWidth', 0.5);
-    end
-
-    hRef = plot(ax, t, refW, '--', 'Color', S.cRef, 'LineWidth', 1.5);
-
-    xline(ax, 0, ':', 'Color',[0.4 0.4 0.4]);
-    yline(ax, 0, ':', 'Color',[0.4 0.4 0.4]);
-    xlim(ax, [t(1) t(end)]);
-    ylim(ax, yl);
-    xlabel(ax, 'Time from R-peak (ms)', 'FontSize', S.fsLabel);
-    ylabel(ax, 'Amplitude (\muV)', 'FontSize', S.fsLabel);
-    % Short title for the same reason as the legend: a long one overruns the
-    % colorbar. The channel count lives in panel (a)'s title and the caption.
-    title(ax, 'Each age separately', 'FontSize', S.fsTitle, 'FontWeight','normal');
-
-    % Short label: this panel is narrow and the colorbar sits immediately to its
-    % right, so a legend wide enough to spell out "true ECG" runs into the age
-    % scale. The caption carries the full description.
-    lg = legend(ax, hRef, sprintf('Validated (n = %d)', refN), ...
-        'Location','northwest', 'FontSize', S.fsAxis-1);
-    set(lg,'Box','off');
-    style_axes(ax, S);
-
-    % Discrete age scale, in place of a seven-entry legend that would cover the
-    % waveforms it is meant to explain.
-    %
-    % An 'eastoutside' colorbar resizes the axes it attaches to, which in a
-    % three-panel row silently pulls this panel out of alignment with the other
-    % two. The position is captured first and restored after, and the bar is
-    % then placed by hand in the gap that leaves.
-    pos = get(ax,'Position');
-    colormap(ax, cols);
-    cb = colorbar(ax, 'Location','eastoutside');
-    set(ax, 'Position', pos);
-    set(cb, 'Position', [pos(1)+pos(3)+0.011, pos(2), 0.010, pos(4)]);
-    try, clim(ax, [0.5 nBand+0.5]); catch, caxis(ax, [0.5 nBand+0.5]); end %#ok<CAXIS>
-    set(cb, 'Ticks', 1:nBand, 'TickLabels', bandLabel, 'TickDirection','out', ...
-            'FontName', S.font, 'FontSize', S.fsAxis-1, 'LineWidth', 0.8);
-    cb.Label.String = 'Age (years)';
-    cb.Label.FontSize = S.fsLabel;
-    cb.Label.FontName = S.font;
-end
-
-function panel_cohort_compare(ax, S, times, wAll, semAll, nAll, refW, semRef, ...
-                              refN, rAll, hepWindow, nChan)
-    % The deployment cohort as a whole against the validated cohort: the
-    % aggregate version of what panel (a) resolves by age.
-    %
-    % Both curves carry a standard-error band. n = 14 against two thousand
-    % means the two are estimated with very different precision, and a band on
-    % only one of them would invite the reader to treat them as equally firm.
-    axes(ax); hold(ax,'on');
-    t = times*1000;
-
-    % Y-limits from the data including both SEM bands, applied at the end; the
-    % patch is oversized and clipped so its height cannot feed back into them.
-    % See the note in panel_age_waves.
-    allY = [wAll(:); refW(:); wAll(:)-semAll(:); wAll(:)+semAll(:)];
-    if ~isempty(semRef)
-        allY = [allY; refW(:)-semRef(:); refW(:)+semRef(:)];
-    end
-    allY = allY(isfinite(allY));
-    yLo = min(allY); yHi = max(allY);
-    % More headroom than (b): this panel carries both a legend at the top left
-    % and the correlation annotation at the bottom right.
-    yl = [yLo yHi] + [-0.14 0.16]*(yHi - yLo);
-
-    patch(ax, hepWindow([1 2 2 1])*1000, 1e4*[-1 -1 1 1], ...
-          S.cShade, 'EdgeColor','none', 'FaceAlpha',0.55);
-
-    if ~isempty(semRef); band(ax, t, refW, semRef, S.cRef, 0.18); end
-    band(ax, t, wAll, semAll, [0.35 0.35 0.35], 0.20);
-
-    hRef = plot(ax, t, refW, '--', 'Color', S.cRef,        'LineWidth', 2.2);
-    hAll = plot(ax, t, wAll, '-',  'Color', [0.20 0.20 0.20], 'LineWidth', 2.0);
-
-    xline(ax, 0, ':', 'Color',[0.4 0.4 0.4]);
-    yline(ax, 0, ':', 'Color',[0.4 0.4 0.4]);
-    xlim(ax, [t(1) t(end)]);
-    ylim(ax, yl);
-    xlabel(ax, 'Time from R-peak (ms)', 'FontSize', S.fsLabel);
-    ylabel(ax, 'Amplitude (\muV)', 'FontSize', S.fsLabel);
-    title(ax, sprintf('All ages pooled (%d channels)', nChan), ...
-        'FontSize', S.fsTitle, 'FontWeight','normal');
-
-    text(ax, 0.975, 0.05, sprintf('waveform r = %.3f (%.0f-%.0f ms)', rAll, ...
-         hepWindow(1)*1000, hepWindow(2)*1000), 'Units','normalized', ...
-        'HorizontalAlignment','right', 'VerticalAlignment','bottom', ...
-        'FontName',S.font, 'FontSize',S.fsAxis-1, 'Color',[0.30 0.30 0.30]);
-
-    lg = legend(ax, [hRef hAll], ...
-        {sprintf('Validated (n = %d)', refN), ...
-         sprintf('Deployment (n = %d)', nAll)}, ...
-        'Location','northwest', 'FontSize', S.fsAxis-1);
-    set(lg,'Box','off');
-    style_axes(ax, S);
-end
-
-function panel_letter(ax, S, ch)
-    % Placed in figure coordinates against the axes' top-left corner, so the
-    % letters line up across panels of different heights. The box is kept
-    % shallow because these are normalized units: on a 6.5-inch figure a tall
-    % box would centre the letter well above the panel it labels.
-    p = get(ax,'Position');
-    annotation(ancestor(ax,'figure'), 'textbox', ...
-        [p(1)-0.048, p(2)+p(4)+0.004, 0.05, 0.050], 'String', ch, ...
-        'EdgeColor','none', 'FontName',S.font, 'FontSize',12, ...
-        'FontWeight','bold', 'HorizontalAlignment','left', ...
-        'VerticalAlignment','middle');
-end
-
-function panel_age_similarity(ax, S, res, cols, rhoObs, pObs)
-    % Agreement with the validated waveform against age, with the noise ceiling
-    % behind it so a data-quality gradient cannot be mistaken for a
-    % developmental one.
-    %
-    % Two series, not three. Once the amplitude screen is applied every band's
-    % reliability lands between 0.98 and 1.00, so the ceiling is a flat line and
-    % the noise-corrected series is just the observed one divided by a constant
-    % - a third curve of the same shape, carrying no information the other two
-    % do not. It is dropped from the panel and its trend reported in the text.
-    % The ceiling stays, because a flat ceiling under a rising series is exactly
-    % what rules out the confound, and that has to be visible rather than
-    % asserted.
-    axes(ax); hold(ax,'on');
-    x  = [res.ageMean];
-    nB = numel(res);
-
-    % Ceiling: the r each band could reach against a perfectly matched
-    % reference given its own noise. Everything below it is unexplained shape.
-    % Drawn as a bare line - markers on a flat series read as data points that
-    % invite comparison band by band, which is not what it is for.
-    hCeil = plot(ax, x, [res.ceiling], '--', 'Color',[0.60 0.60 0.60], 'LineWidth',1.2);
-
-    % Observed, with bootstrap CI over subjects within the band.
-    for b = 1:nB
-        plot(ax, [x(b) x(b)], [res(b).rLo res(b).rHi], '-', ...
-             'Color', cols(b,:), 'LineWidth', 1.6);
-    end
-    hObs = plot(ax, x, [res.r], '-', 'Color',[0.25 0.25 0.25], 'LineWidth',1.3);
-    for b = 1:nB
-        plot(ax, x(b), res(b).r, 'o', 'MarkerSize',7, ...
-             'MarkerEdgeColor',cols(b,:), 'MarkerFaceColor',cols(b,:), 'LineWidth',1.0);
-    end
-
-    yline(ax, 0, ':', 'Color',[0.4 0.4 0.4]);
-
-    % Fix the x-range to the bands before anything is placed relative to it.
-    xlim(ax, [min(x)-1.2, max(x)+1.2]);
-    xlabel(ax, 'Age (years)', 'FontSize', S.fsLabel);
-    ylabel(ax, 'Similarity to validated HEP (r)', 'FontSize', S.fsLabel);
-    title(ax, 'Agreement by age', 'FontSize', S.fsTitle, 'FontWeight','normal');
-
-    lo = min([[res.r] [res.ceiling] [res.rLo]]);
-    hi = max([[res.r] [res.ceiling] [res.rHi]]);
-    ylim(ax, [lo-0.10*(hi-lo)-0.02, hi+0.22*(hi-lo)+0.02]);
-
-    lg = legend(ax, [hObs hCeil], {'observed','noise ceiling'}, ...
-                'Location','southeast', 'FontSize', S.fsAxis-2);
-    set(lg,'Box','off');
-
-    % Only the observed trend is annotated. A rank correlation over the ceiling
-    % is not reportable here: reliability spans 0.98 to 1.00 across the bands, so
-    % its ordering is decided by fourth-decimal noise in the split-half
-    % resampling and rho moves between runs. The flat dashed ceiling line already
-    % makes the point visually, and the range is stated in the text.
-    txt = sprintf('observed \\rho = %+.2f, p = %.3f', rhoObs, pObs);
-    text(ax, 0.03, 0.97, txt, 'Units','normalized', 'HorizontalAlignment','left', ...
-        'VerticalAlignment','top', 'FontName',S.font, 'FontSize',S.fsAxis-2, ...
-        'Color',[0.30 0.30 0.30]);
-
-    style_axes(ax, S);
-end
 
 %% ================================ STATS ================================
 
@@ -708,85 +417,4 @@ function [rho, p] = spearman_exact(x, y)
         rp(k) = corr(rx, ry(P(k,:)));
     end
     p = mean(abs(rp) >= abs(rho) - 1e-12);
-end
-
-%% ================================ STYLE ================================
-
-function C = age_colors(n)
-    % One distinct hue per age band, at matched saturation and value.
-    %
-    % This is the same sweep the quality-gate figure uses (band_palette in
-    % hbn_gate_margin.py: HSV 288 to 48 degrees at S = 0.58, V = 0.72), so that age
-    % is encoded identically wherever it appears in the paper. The two figures
-    % previously used different scales for the same variable.
-    %
-    % Sweeping hue rather than ramping one hue's opacity keeps every band
-    % equally visible on white, which matters when thirteen bands are overlaid.
-    % The sweep runs violet to amber and stops deliberately short of red, which
-    % the gate figure reserves for the threshold line.
-    hues = linspace(288, 48, n)' / 360;
-    C = hsv2rgb([hues, repmat(0.58, n, 1), repmat(0.72, n, 1)]);
-end
-
-function S = fig_style()
-    % Mirrors deploy_step7_group_hep's fig_style so the two figures sit together.
-    S = struct();
-    S.font    = 'Arial';
-    S.fsAxis  = 9;
-    S.fsLabel = 10;
-    S.fsTitle = 10;
-    S.lw      = 1.7;
-    S.lwThin  = 1.2;
-    S.cReal = [0.10 0.10 0.10];
-    S.cSurr = [0.55 0.55 0.55];
-    S.cRef  = [0.00 0.62 0.45];
-    S.cShade = [0.91 0.91 0.91];
-    S.alpha  = 0.20;
-end
-
-function f = new_fig(S, wIn, hIn)
-    f = figure('Color','w','Units','inches','Position',[1 1 wIn hIn], ...
-               'PaperPositionMode','auto','InvertHardcopy','off');
-    set(f,'DefaultAxesFontName',S.font,'DefaultAxesFontSize',S.fsAxis, ...
-          'DefaultTextFontName',S.font);
-end
-
-function band(ax, x, y, e, col, a)
-    xx = [x(:); flipud(x(:))];
-    yy = [y(:)-e(:); flipud(y(:)+e(:))];
-    ok = ~isnan(xx) & ~isnan(yy);
-    patch(ax, xx(ok), yy(ok), col, 'FaceAlpha', a, 'EdgeColor','none');
-end
-
-function style_axes(ax, S)
-    set(ax,'FontName',S.font,'FontSize',S.fsAxis,'TickDir','out', ...
-           'Box','off','LineWidth',0.8,'Layer','top','TickLength',[0.015 0.015]);
-end
-
-function export_all(f, outPath, name)
-    % 600 dpi rather than 300: the age panel is drawn in 0.5 pt hairlines, and
-    % at 300 dpi a 0.5 pt stroke lands on about two pixels, so anti-aliasing
-    % greys it out and adjacent bands blur back together. The PDF is vector and
-    % unaffected either way - submit that one - but the PNG should not
-    % misrepresent what the figure looks like.
-    try
-        exportgraphics(f, fullfile(outPath,[name '.png']), 'Resolution', 600);
-        exportgraphics(f, fullfile(outPath,[name '.pdf']), 'ContentType','vector');
-    catch
-        print(f, fullfile(outPath,[name '.png']), '-dpng','-r600');
-        print(f, fullfile(outPath,[name '.pdf']), '-dpdf','-vector');
-    end
-    print(f, fullfile(outPath,[name '.emf']), '-dmeta');
-    savefig(f, fullfile(outPath,[name '.fig']));
-end
-
-function standalone(S, outPath, name, wIn, hIn, drawFcn)
-    % Explicit position rather than the default: these panels carry a colorbar
-    % or a four-entry legend, and the default axes runs too close to the edges
-    % for either to sit without clipping.
-    f = new_fig(S, wIn, hIn);
-    ax = axes(f, 'Position', [0.135 0.150 0.750 0.775]);
-    drawFcn(ax);
-    export_all(f, outPath, name);
-    close(f);
 end

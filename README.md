@@ -92,6 +92,7 @@ This is the validation cohort of the paper, available under a data-use agreement
 3. Run `python/hbn_merge_demographics.py`, then `python/hbn_gate_age_transfer.py` and
    `python/hbn_gate_margin.py` (gate rejection by age).
 4. In MATLAB, run `matlab/deployment` steps 1–8.
+5. Run `python/fig_hep_by_age.py` to draw Fig. 5 from the step-8 output and the adult reference.
 
 ### C. Your own dataset
 
@@ -130,7 +131,7 @@ place of the adult outputs, it reproduces the paper's adult–HBN waveform agree
 | 5 | `adult_step5_remove_ocular_ics` | `deploy_step5_remove_ocular_ics` | remove ocular components (ICLabel); cardiac components are kept |
 | 6 | `adult_step6_epoch` | `deploy_step6_epoch` | epoch −300 to 600 ms around each R-peak |
 | 7 | `adult_step7_hep_validation` | `deploy_step7_group_hep` | true- vs reconstructed-peak HEP against a surrogate, `ga_waveforms.png` (Fig. 4) / group HEP |
-| 8 | `adult_step8_cfa_check` | `deploy_step8_hep_by_age` | cardiac-field-artifact check / HEP by age band (Fig. 5, Supplementary Table 5) |
+| 8 | `adult_step8_cfa_check` | `deploy_step8_hep_by_age` | cardiac-field-artifact check / HEP by age band (Supplementary Table 5; Fig. 5 is drawn by `python/fig_hep_by_age.py`) |
 
 Each step writes a folder of the same name. The adult steps 1–6 write under
 `outputs/adult_validation/true_rpeaks/` or `.../reconstructed_rpeaks/`. Each script finds the
