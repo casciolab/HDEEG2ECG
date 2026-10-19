@@ -1,0 +1,36 @@
+# Data go in inputs/ (only its folder skeleton and README are tracked);
+# every result is written to outputs/.
+/inputs/**
+!/inputs/**/
+!/inputs/README.md
+!/inputs/**/.gitkeep
+outputs/
+data/
+matlab/toolboxes/
+python/figures/
+
+# the toolbox executable is distributed as a GitHub release asset, not in git
+toolbox/dist/
+
+*.set
+*.fdt
+*.edf
+*.bdf
+*.mat
+!matlab/reference/adult_hep_reference.mat
+*.npz
+*.npy
+*.xlsx
+*.csv
+!splits/split_manifest.csv
+
+# the released weights are the only checkpoint tracked
+*.ckpt
+*.pt
+!weights/final_model_weights.pt
+
+__pycache__/
+*.pyc
+lightning_logs/
+build/
+.spyproject/

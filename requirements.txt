@@ -1,0 +1,11 @@
+# Versions used for the paper (Python 3.11.15)
+torch==2.5.1
+lightning==2.6.1
+numpy==1.26.4
+scipy==1.17.1
+pandas==3.0.1
+mne==1.11.0
+matplotlib==3.10.8
+scikit-learn==1.8.0
+# only needed to build the standalone toolbox executable (toolbox/hdeeg2ecg_toolbox.spec)
+# pyinstaller==6.19.0

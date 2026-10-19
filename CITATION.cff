@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software or the trained weights, please cite the paper below."
+title: "HDEEG2ECG: ECG reconstruction from high-density EEG, with a reference-free quality-control toolbox"
+version: 1.0.0
+license: MIT
+repository-code: "https://github.com/casciolab/HDEEG2ECG"
+authors:
+  - family-names: Fraile-Vazquez
+    given-names: Matias E.
+    affiliation: "Life Span Institute, University of Kansas"
+preferred-citation:
+  type: article
+  title: "HDEEG2ECG: Electrocardiogram reconstruction from raw high-density electroencephalography data"
+  status: submitted
+  authors:
+    - family-names: Fraile-Vazquez
+      given-names: Matias E.
+    - family-names: Zoltowski
+      given-names: Alisa R.
+    - family-names: Gelerian
+      given-names: Emily
+    - family-names: Emina
+      given-names: Facundo
+    - family-names: Isherwood
+      given-names: Carly
+    - family-names: Shelton
+      given-names: Amanda
+    - family-names: Thomas
+      given-names: Sophia
+    - family-names: Schneider
+      given-names: Bella
+    - family-names: Patt
+      given-names: Kira
+    - family-names: Hazleton
+      given-names: Jessica
+    - family-names: Keçeli-Kaysili
+      given-names: Bahar
+    - family-names: Cascio
+      given-names: Carissa J.
