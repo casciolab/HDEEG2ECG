@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software or the trained weights, please cite the paper below."
-title: "HDEEG2ECG: ECG reconstruction from high-density EEG, with a reference-free quality-control toolbox"
+title: "Heartbeat signal recovered from high-density EEG enables brain-body neural marker analysis"
 version: 1.0.0
 license: MIT
 repository-code: "https://github.com/casciolab/HDEEG2ECG"
