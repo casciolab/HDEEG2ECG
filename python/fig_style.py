@@ -38,7 +38,6 @@ import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 
 # ============================================================
 # PHYSICAL SIZE
@@ -78,24 +77,6 @@ C = {
 }
 
 LINESTYLE = {'true': '-', 'recon': (0, (4.5, 2.0)), 'surrogate': (0, (1.2, 1.8))}
-
-# Diverging map for the carpet plot, centred on zero, neutral (not white) midpoint
-# so that zero is visually distinct from missing data.
-CMAP_DIVERGING = LinearSegmentedColormap.from_list(
-    'hep_div',
-    ['#1C4E77', '#5B8DB8', '#AFC6D8', '#E6E4DD', '#E8B69A', '#C8654A', '#8A2B18'],
-    N=256,
-)
-
-
-def diverging_norm(data, symmetric=True):
-    """Norm centred on zero. Symmetric by default so colour encodes sign honestly."""
-    if symmetric:
-        v = float(np.nanpercentile(np.abs(data), 99))
-        return TwoSlopeNorm(vmin=-v, vcenter=0.0, vmax=v)
-    return TwoSlopeNorm(vmin=float(np.nanmin(data)), vcenter=0.0,
-                        vmax=float(np.nanmax(data)))
-
 
 # ============================================================
 # RCPARAMS
@@ -212,18 +193,6 @@ def offset_spines(ax, pts=3.0):
     for side in ('left', 'bottom'):
         if ax.spines[side].get_visible():
             ax.spines[side].set_position(('outward', pts))
-
-
-def scalebar(ax, x, y, dx, dy, xlabel, ylabel, lw=0.9, pad=0.012):
-    """L-shaped scale bar. Use instead of axes when the absolute values on an
-    axis are not the point (raw traces, butterfly plots) -- it removes an entire
-    axis worth of chrome while keeping the units legible."""
-    ax.plot([x, x, x + dx], [y + dy, y, y], color=C['ink'], lw=lw,
-            solid_capstyle='butt', clip_on=False, zorder=6)
-    ax.text(x + dx / 2, y - pad * (ax.get_ylim()[1] - ax.get_ylim()[0]), xlabel,
-            ha='center', va='top', color=C['ink_soft'], clip_on=False)
-    ax.text(x - pad * (ax.get_xlim()[1] - ax.get_xlim()[0]), y + dy / 2, ylabel,
-            ha='right', va='center', rotation=90, color=C['ink_soft'], clip_on=False)
 
 
 def stat_text(ax, s, x=0.98, y=0.96, ha='right', va='top', color=None):

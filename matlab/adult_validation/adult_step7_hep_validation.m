@@ -52,7 +52,7 @@
 % Inputs:  true_rpeaks/adult_step6_epoch\*.set  (epoched on true R-peaks)
 %          reconstructed_rpeaks/adult_step6_epoch\*.set  (epoched on reconstructed R-peaks)
 % Outputs: adult_step7_hep_validation\validation_results.mat
-%          adult_step7_hep_validation\ga_waveforms.png / sensitivity.png
+%          adult_step7_hep_validation\ga_waveforms.png   (Fig. 4)
 
 %% CONFIG
 clc
@@ -371,7 +371,6 @@ gaTrue  = mean(cat(3, avgsTrue{:}),  3);
 gaRecon = mean(cat(3, avgsRecon{:}), 3);
 
 plot_ga_waveforms(gaTrue, gaRecon, trueFT{1}.time, roiChannels, roiTimeSamples, nSubj, outPath);
-plot_sensitivity(effectTrue, effectRecon, dzTrue, dzRecon, outPath);
 
 fprintf('\nDone. Results saved to %s\n', outPath);
 
@@ -525,33 +524,4 @@ function plot_ga_waveforms(gaTrue, gaRecon, timeVec, roiChannels, roiTimeSamples
     box off;
     saveas(f, fullfile(outPath,'ga_waveforms.png'));
     savefig(f, fullfile(outPath,'ga_waveforms.fig'));
-end
-
-function plot_sensitivity(effectTrue, effectRecon, dzTrue, dzRecon, outPath)
-    % Sensitivity preservation: per-subject HEP detection effect recovered from
-    % each trigger source. Points on the identity line mean the reconstruction
-    % recovers the same effect the ground-truth ECG does.
-    f = figure('Color','w');
-    tiledlayout(f,1,2,'TileSpacing','compact','Padding','compact');
-
-    nexttile; hold on;
-    lims = [min([effectTrue; effectRecon]) max([effectTrue; effectRecon])];
-    pad = 0.1*range(lims) + eps;
-    lims = [lims(1)-pad, lims(2)+pad];
-    plot(lims, lims, 'k--');
-    scatter(effectTrue, effectRecon, 44, 'filled');
-    xlim(lims); ylim(lims); axis square;
-    xlabel('HEP effect from true peaks (\muV)');
-    ylabel('From reconstructed peaks (\muV)');
-    title('Per-subject effect recovery'); box off;
-
-    nexttile; hold on;
-    bar([dzTrue dzRecon], 0.6, 'FaceColor',[0.35 0.5 0.7]);
-    xticks(1:2); xticklabels({'True peaks','Recon peaks'});
-    ylabel('HEP detection effect size (d_z)');
-    title(sprintf('Detection sensitivity (ratio %.2f)', dzRecon/dzTrue));
-    box off;
-
-    saveas(f, fullfile(outPath,'sensitivity.png'));
-    savefig(f, fullfile(outPath,'sensitivity.fig'));
 end

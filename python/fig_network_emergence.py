@@ -32,8 +32,7 @@ Two stages, because the panel needs the weights and the recordings:
     python fig_network_emergence.py --prepare     # GPU, ~1 min
     python fig_network_emergence.py               # figures/fig_network_emergence.{pdf,png,svg}
 
-Requires fig_style.py, summary_figure_panels.py, summary_figure.py, network_activations.py and
-hdeeg2ecg_model.py in the same folder.
+Requires fig_style.py, network_activations.py and hdeeg2ecg_model.py in the same folder.
 
 @author: figures for Fraile-Vazquez et al.
 """
@@ -50,8 +49,8 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Rectangle
 
 import fig_style as fs
-from summary_figure import RUN_DIR, SFREQ, WINDOW, load_subject_table
-from network_activations import (HALF_WIN, N_PERM, N_STAT, STAGES,
+from network_activations import (RUN_DIR, SFREQ, WINDOW, load_subject_table,
+                            HALF_WIN, N_PERM, N_STAT, STAGES,
                             _receptive_field_samples, beat_modulation,
                             extract_activations)
 

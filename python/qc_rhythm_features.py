@@ -15,7 +15,6 @@ evaluated in both, and each split cell reports the failed-vs-good subject counts
 Outputs (all to OUTPUT_DIR):
     rhythm_qc.csv            -- per-subject features + F1
     rhythm_qc_separation.csv -- per-feature: rho/p pooled, pooled gap, and per-split gaps+counts
-    rhythm_qc_scatter.png    -- HR-robust composite vs F1
 
 Inference only (loads the released weights, P.WEIGHTS_PATH; no training).
 Run next to the pipeline:  python qc_rhythm_features.py
@@ -24,9 +23,6 @@ import os
 import numpy as np
 import pandas as pd
 from scipy import stats as sps
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import torch
 
 import hdeeg2ecg_model as P
@@ -181,25 +177,7 @@ def main():
     print("        had 0 failures or 0 successes, so a gap is undefined (see the NvN counts).")
     print("        A feature is a robust threshold only if it is CLEAN pooled AND CLEAN in each split.")
 
-    # ============================================================
-    # scatter of the HR-robust composite vs F1
-    # ============================================================
-    fig, ax = plt.subplots(figsize=(7, 5))
-    colors = ['crimson' if f else 'steelblue' for f in fail]
-    ax.scatter(df['implaus_score'], df['f1'], c=colors, s=60, edgecolor='k', linewidth=0.5)
-    for _, r in df.iterrows():
-        ax.annotate(r['id'], (r['implaus_score'], r['f1']), fontsize=6, xytext=(3, 3),
-                    textcoords='offset points')
-    ax.axhline(FAIL_F1, color='gray', ls='--', lw=0.8)
-    ax.set_xlabel('rhythm implausibility score (HR-robust; higher = worse)')
-    ax.set_ylabel('F1 (validation only)')
-    ax.set_title('Reference-free rhythm QC vs reconstruction quality\n'
-                 f'red = failure (F1<{FAIL_F1}), blue = good')
-    fig.tight_layout()
-    fig.savefig(os.path.join(P.OUTPUT_DIR, 'rhythm_qc_scatter.png'), dpi=150)
-    plt.close(fig)
-
-    print(f"\nwrote rhythm_qc.csv, rhythm_qc_separation.csv, rhythm_qc_scatter.png to {P.OUTPUT_DIR}")
+    print(f"\nwrote rhythm_qc.csv and rhythm_qc_separation.csv to {P.OUTPUT_DIR}")
 
 
 if __name__ == '__main__':

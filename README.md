@@ -71,17 +71,16 @@ This is the validation cohort of the paper, available under a data-use agreement
    | 5 | `validation_summary_table.py` | Table 1 rows (bootstrap 95% CIs, 5,000 resamples) | Table 1 |
    | 6 | `validation_leakage_indices.py` | `leakage_compare.csv`; single-channel vs multichannel leakage | Methods |
    | 7 | `validation_heart_rate.py` | per-subject heart-rate table; Bland–Altman | Supplementary Table 3 |
-   | 8 | `network_activations.py --prepare` | `network_activations_inputs.npz`: per-stage activations, electrode deletion | — |
-   | 9 | `validation_electrode_deletion.py` | Supplementary Table 4 rows | Supplementary Table 4 |
-   | 10 | `fig_overview.py` | `python/figures/fig_overview` | Fig. 1 |
-   | 11 | `fig_leakage_vs_f1.py` | `python/figures/fig_leakage_vs_f1.png`; leakage–F1 statistics | Fig. 2 |
-   | 12 | `fig_network_emergence.py --prepare`, then without `--prepare` | `python/figures/fig_network_emergence` | Fig. 3 |
+   | 8 | `validation_electrode_deletion.py --prepare`, then without `--prepare` | electrode-deletion sweep and single-electrode importance (`electrode_deletion_inputs.npz`); the table rows | Supplementary Table 4 |
+   | 9 | `fig_overview.py` | `python/figures/fig_overview` | Fig. 1 |
+   | 10 | `fig_leakage_vs_f1.py` | `python/figures/fig_leakage_vs_f1.png`; leakage–F1 statistics | Fig. 2 |
+   | 11 | `fig_network_emergence.py --prepare`, then without `--prepare` | `python/figures/fig_network_emergence` | Fig. 3 |
 
 3. Run the toolbox on `inputs/adult/recordings/` with `outputs/adult_validation/toolbox/` as
    the work folder (Stages 1–3).
 4. In MATLAB, run `matlab/adult_validation` steps 1–6 twice, first with
    `setenv('HEP_TRIGGER','true')` and then with `setenv('HEP_TRIGGER','reconstructed')`.
-   Then run steps 7 and 8.
+   Then run step 7.
 
 ### B. Healthy Brain Network
 
@@ -89,8 +88,8 @@ This is the validation cohort of the paper, available under a data-use agreement
    `inputs/hbn/recordings/` and the `participants*.csv` files in `inputs/hbn/`.
 2. Run the toolbox on `inputs/hbn/recordings/` with `outputs/deployment/hbn/toolbox/` as the
    work folder (Stages 1–3).
-3. Run `python/hbn_merge_demographics.py`, then `python/hbn_gate_age_transfer.py` and
-   `python/hbn_gate_margin.py` (gate rejection by age).
+3. Run `python/hbn_merge_demographics.py`, then `python/hbn_gate_by_age.py` (gate rejection
+   by year of age, Results).
 4. In MATLAB, run `matlab/deployment` steps 1–8.
 5. Run `python/fig_hep_by_age.py` to draw Fig. 5 from the step-8 output and the adult reference.
 
@@ -120,6 +119,18 @@ place of the adult outputs, it reproduces the paper's adult–HBN waveform agree
 
 ## Script reference
 
+### Paper figures
+
+The repository draws the paper's five figures and no others.
+
+| Figure | Drawn by |
+|---|---|
+| Fig. 1 | `python/fig_overview.py` |
+| Fig. 2 | `python/fig_leakage_vs_f1.py` |
+| Fig. 3 | `python/fig_network_emergence.py` |
+| Fig. 4 | `matlab/adult_validation/adult_step7_hep_validation.m` (`ga_waveforms.png`) |
+| Fig. 5 | `python/fig_hep_by_age.py` |
+
 ### MATLAB steps
 
 | Step | `adult_validation/` | `deployment/` | What it does |
@@ -130,8 +141,8 @@ place of the adult outputs, it reproduces the paper's adult–HBN waveform agree
 | 4 | `adult_step4_amica_components` | `deploy_step4_amica_components` | save the AMICA component matrices |
 | 5 | `adult_step5_remove_ocular_ics` | `deploy_step5_remove_ocular_ics` | remove ocular components (ICLabel); cardiac components are kept |
 | 6 | `adult_step6_epoch` | `deploy_step6_epoch` | epoch −300 to 600 ms around each R-peak |
-| 7 | `adult_step7_hep_validation` | `deploy_step7_group_hep` | true- vs reconstructed-peak HEP against a surrogate, `ga_waveforms.png` (Fig. 4) / group HEP |
-| 8 | `adult_step8_cfa_check` | `deploy_step8_hep_by_age` | cardiac-field-artifact check / HEP by age band (Supplementary Table 5; Fig. 5 is drawn by `python/fig_hep_by_age.py`) |
+| 7 | `adult_step7_hep_validation` | `deploy_step7_group_hep` | true- vs reconstructed-peak HEP against a surrogate, `ga_waveforms.png` (Fig. 4) / group HEP on the adult region of interest |
+| 8 | — | `deploy_step8_hep_by_age` | HEP by age band (Supplementary Table 5; Fig. 5 is drawn by `python/fig_hep_by_age.py`) |
 
 Each step writes a folder of the same name. The adult steps 1–6 write under
 `outputs/adult_validation/true_rpeaks/` or `.../reconstructed_rpeaks/`. Each script finds the
@@ -140,10 +151,9 @@ run in a fresh MATLAB session.
 
 ### Supporting Python modules
 
-These are imported by the scripts above: `fig_style.py` (figure style), `network_activations.py`
-(per-stage activations, beat-locked modulation and electrode deletion), and `summary_figure.py`,
-`summary_figure_panels.py` and `learned_topography.py` (loaders and helpers shared with earlier
-draft figures).
+These are imported by the scripts above: `fig_style.py` (figure style) and
+`network_activations.py` (per-stage activations and beat-locked modulation in the network, and
+the per-recording results table).
 
 ### Retraining
 

@@ -8,7 +8,6 @@ This is the cleaned + extended pipeline. Relative to the original script it:
     second masking schedule, the hand-rolled early-stopping that duplicated
     Lightning's, and the DDP wrapper that only got in the way at devices=1);
   - adds a subject-level, cohort-stratified train / val1 / val2 split;
-  - adds a latent-width ablation with automatic knee detection + figure;
   - computes and stores a full statistical validation suite (subject-level
     aggregation, cluster-bootstrap CIs, QRS detection F1, R-peak timing error,
     Bland-Altman HR agreement, ASD-vs-TD equivalence test) on BOTH validation
@@ -45,9 +44,6 @@ from torch.utils.data import Dataset, DataLoader
 from scipy.signal import find_peaks
 from scipy import stats as sps
 from sklearn.model_selection import train_test_split
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import lightning as L
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 
@@ -74,7 +70,7 @@ CUDNN_DETERMINISTIC = False   # False = fast (cuDNN autotuning); True = bit-exac
 
 # --- splits (subject level, cohort stratified). Must sum to 1.0 ---
 FRAC_TRAIN = 0.70
-FRAC_VAL1  = 0.15   # used during training for early stopping / model selection / the ablation knee
+FRAC_VAL1  = 0.15   # used during training for early stopping / model selection
 FRAC_VAL2  = 0.15   # locked box: untouched by training, used to test the post-inference toolbox
 
 # Freeze the split instead of regenerating it. The split is produced by
@@ -122,20 +118,10 @@ LAMBDA_CORR   = 2.0   # waveform-correlation term. Couples the loss to reconstru
                       # to r~0 at the same val_loss as a good fit. Keep it >= LAMBDA_SHAPE.
 TAU = 1.0
 
-# --- latent width: testing (sweep) vs. selected (single width) ---
-# RUN_ABLATION = True  -> "testing" path: sweep ABLATION_WIDTHS over ABLATION_SEEDS,
-#                         pick the knee, then train the final model at that width.
-# RUN_ABLATION = False -> "just run it" path: skip the sweep entirely and train the
-#                         final model directly at SELECTED_LATENT_DIM. Nothing else
-#                         changes width afterwards -- the final model IS this width.
-RUN_ABLATION        = False   # toggle: False = single selected width; True = full sweep
-SELECTED_LATENT_DIM = 32      # latent width trained when RUN_ABLATION is False
-                              # (also the fallback if a sweep ever yields no knee)
+# --- width of the 32-channel stage of the deployed model ---
+SELECTED_LATENT_DIM = 32
 
-# --- ablation sweep settings (only used when RUN_ABLATION = True) ---
-ABLATION_WIDTHS    = [32, 64, 128, 256, 512]
-ABLATION_SEEDS     = [42, 43]         # 2 seeds for error bars; 3+ strongly advised -- with 2 seeds
-                                      # a single collapsed run halves a width's mean and can move the knee
+# --- training length for the decoder sweep and component ablation (Supplementary Tables 1-2) ---
 ABLATION_MAX_EPOCHS = 300             # ceiling only; early stopping decides actual length (keep generous so no width is cut short)
 ABLATION_PATIENCE   = 25              # was 40; stops sooner after a val plateau (fair across widths)
 
@@ -1071,36 +1057,6 @@ def pooled_leakage_analysis(per_subject_dfs):
     return out
 
 
-# ============================================================
-# KNEE DETECTION  (kneedle-style perpendicular distance)
-# ============================================================
-def find_knee(widths, metric_higher_is_better):
-    x = np.log2(np.asarray(widths, dtype=float))
-    y = np.asarray(metric_higher_is_better, dtype=float)
-    xn = (x - x.min()) / (x.max() - x.min() + 1e-12)
-    yn = (y - y.min()) / (y.max() - y.min() + 1e-12)
-    # distance of each point above the chord from first to last
-    dist = yn - (xn * (yn[-1] - yn[0]) + yn[0])
-    knee_idx = int(np.argmax(dist))
-    return widths[knee_idx], knee_idx
-
-
-def plot_ablation(widths, means, los, his, knee_width, path):
-    plt.figure(figsize=(5.5, 4))
-    plt.errorbar(widths, means, yerr=[np.array(means) - np.array(los), np.array(his) - np.array(means)],
-                 marker='o', capsize=3, lw=1.5)
-    plt.axvline(knee_width, ls='--', color='crimson', lw=1, label=f'knee = {knee_width}')
-    plt.xscale('log', base=2)
-    plt.xticks(widths, [str(w) for w in widths])
-    plt.xlabel('Latent width')
-    plt.ylabel('Validation Pearson r (subject-level mean)')
-    plt.legend(frameon=False)
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-    plt.savefig(path.replace('.png', '.pdf'))
-    plt.close()
-
-
 def decoder_label(schedule):
     """Short, filesystem-safe label for a decoder schedule (None -> 'original')."""
     if schedule is None:
@@ -1108,121 +1064,16 @@ def decoder_label(schedule):
     return '-'.join(str(c) for c in schedule)
 
 
-def plot_decoder_sweep(labels, means, sems, best_idx, path, title='Decoder channel-schedule sweep (val1)'):
-    plt.figure(figsize=(max(5.5, 0.9 * len(labels)), 4))
-    x = np.arange(len(labels))
-    plt.bar(x, means, yerr=1.96 * np.asarray(sems), capsize=3,
-            color=['crimson' if i == best_idx else 'slategray' for i in x])
-    plt.xticks(x, labels, rotation=30, ha='right', fontsize=7)
-    plt.ylabel('Validation Pearson r (subject-level mean)')
-    plt.title(title)
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-    plt.savefig(path.replace('.png', '.pdf'))
-    plt.close()
-
-
-def plot_bland_altman(ba, title, path):
-    if not ba:
-        return
-    plt.figure(figsize=(5.5, 4))
-    plt.scatter(ba['mean'], ba['diff'], s=20)
-    plt.axhline(ba['bias'], color='k', lw=1)
-    plt.axhline(ba['loa_upper'], color='grey', ls='--', lw=1)
-    plt.axhline(ba['loa_lower'], color='grey', ls='--', lw=1)
-    plt.xlabel('Mean HR (true, predicted) [bpm]')
-    plt.ylabel('Predicted - True HR [bpm]')
-    plt.title(title)
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-    plt.savefig(path.replace('.png', '.pdf'))
-    plt.close()
-
-
-# One colour for every recording. The paper's claim is cohort INVARIANCE, so
-# colouring points by group invites the reader to hunt for a difference the
-# analysis reports as undetectable, and at n = 20 any apparent clustering is
-# noise. Cohort remains in the per-subject CSVs for the statistics; it is only
-# dropped from the visual encoding.
-POINT_COLOR = '#3A6EA5'
-
-
-def _save(path):
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-    plt.savefig(path.replace('.png', '.pdf'))
-    plt.close()
-
-
-def plot_se_ppv_scatter(df, split_name, path):
-    """Each subject as a point in sensitivity x PPV space. The 'perfect' cluster
-    sits in the top-right; subjects without recoverable leakage fall away from it."""
-    plt.figure(figsize=(5, 5))
-    plt.scatter(df.sensitivity, df.ppv, s=45, alpha=0.85, color=POINT_COLOR,
-                edgecolor='white', linewidth=0.5, label=f'n = {len(df)}')
-    plt.plot([0, 1], [0, 1], ls=':', color='grey', lw=0.8)
-    plt.xlim(-0.03, 1.03); plt.ylim(-0.03, 1.03)
-    plt.xlabel('Sensitivity (recall)')
-    plt.ylabel('PPV (precision)')
-    plt.title(f'Per-subject R-peak detection ({split_name})')
-    plt.legend(frameon=False, loc='lower left')
-    _save(path)
-
-
-def plot_f1_distribution(df, split_name, path):
-    """Sorted per-subject F1 lollipop -- makes a bimodal (perfect vs failing) split obvious."""
-    d = df.sort_values('f1', ascending=True, na_position='first').reset_index(drop=True)
-    plt.figure(figsize=(6, max(3, 0.26 * len(d))))
-    plt.hlines(range(len(d)), 0, d.f1.fillna(0), color='lightgrey', lw=1)
-    plt.scatter(d.f1, range(len(d)), color=POINT_COLOR, s=35, zorder=3,
-                edgecolor='white', linewidth=0.5)
-    plt.yticks([])          # recording IDs withheld; order is the sort, not an identity
-    plt.xlim(-0.03, 1.03)
-    plt.xlabel('R-peak detection F1')
-    plt.title(f'Per-subject F1, sorted ({split_name})')
-    _save(path)
-
-
-def plot_f1_vs_leakage(df, split_name, path):
-    """The argument-clinching figure: failing subjects are the low-leakage ones."""
-    plt.figure(figsize=(5.5, 4))
-    plt.scatter(df.eeg_leakage, df.f1, s=45, alpha=0.85, color=POINT_COLOR,
-                edgecolor='white', linewidth=0.5)
-    plt.xlabel('EEG cardiac leakage  (R-peak-triggered peak-to-peak, a.u.)')
-    plt.ylabel('R-peak detection F1')
-    plt.ylim(-0.03, 1.03)
-    plt.title(f'Reconstruction quality tracks leakage ({split_name})')
-    _save(path)
-
-
-def plot_timing_error_hist(errs_ms, split_name, path):
-    """Pooled signed latency errors across all matched beats, with the bias marked."""
-    if len(errs_ms) == 0:
-        return
-    plt.figure(figsize=(5.5, 4))
-    plt.hist(errs_ms, bins=40, color='#555555')
-    plt.axvline(0, color='k', lw=1)
-    plt.axvline(np.mean(errs_ms), color='crimson', ls='--', lw=1.2,
-                label=f'bias = {np.mean(errs_ms):.1f} ms')
-    plt.xlabel('R-peak latency error: predicted - true (ms)')
-    plt.ylabel('Matched beats')
-    plt.title(f'Latency agreement ({split_name})')
-    plt.legend(frameon=False)
-    _save(path)
-
-
 # ============================================================
 # EVALUATION OF A SPLIT
 # ============================================================
 def evaluate_split(model, subjects, device, split_name, out_dir):
-    rows, pooled_errs = [], []
+    rows = []
     for s in subjects:
-        row, errs_ms = subject_metrics(model, s, device)
+        row, _ = subject_metrics(model, s, device)
         rows.append(row)
-        pooled_errs.append(errs_ms)
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(out_dir, f'per_subject_metrics_{split_name}.csv'), index=False)
-    pooled = np.concatenate([e for e in pooled_errs if len(e)]) if any(len(e) for e in pooled_errs) else np.array([])
 
     summary = {'split': split_name, 'n_subjects': len(df),
                'n_subjects_ASD': int((df.cohort == 'ASD').sum()),
@@ -1242,16 +1093,8 @@ def evaluate_split(model, subjects, device, split_name, out_dir):
         rho, p = sps.spearmanr(sub.eeg_leakage, sub.f1)
         summary['f1_vs_leakage_spearman'] = {'rho': float(rho), 'p': float(p), 'n': int(len(sub))}
 
-    # figures
-    plot_se_ppv_scatter(df, split_name, os.path.join(out_dir, f'se_ppv_scatter_{split_name}.png'))
-    plot_f1_distribution(df, split_name, os.path.join(out_dir, f'f1_distribution_{split_name}.png'))
-    plot_f1_vs_leakage(df, split_name, os.path.join(out_dir, f'f1_vs_leakage_{split_name}.png'))
-    plot_timing_error_hist(pooled, split_name, os.path.join(out_dir, f'timing_error_hist_{split_name}.png'))
-
     ba = bland_altman(df.true_hr.values, df.pred_hr.values)
     if ba:
-        plot_bland_altman(ba, f'HR agreement ({split_name})',
-                          os.path.join(out_dir, f'bland_altman_HR_{split_name}.png'))
         summary['bland_altman_HR'] = {k: v for k, v in ba.items() if k not in ('mean', 'diff')}
     return df, summary
 
@@ -1372,42 +1215,7 @@ def main():
                'timestamp': datetime.now().isoformat()},
               os.path.join(OUTPUT_DIR, 'run_config.json'))
 
-    # ---- latent width: sweep-and-pick (testing) OR use the selected width ----
-    ablation_summary = None
-    if RUN_ABLATION:
-        print("\n================ LATENT-WIDTH ABLATION ================")
-        rows = []
-        for w in ABLATION_WIDTHS:
-            for sd in ABLATION_SEEDS:
-                best, best_val_r, ep = train_one(w, datamodule, ABLATION_MAX_EPOCHS,
-                                                 ABLATION_PATIENCE, sd, tag=f'ablate_w{w}_s{sd}')
-                # full val1 reconstruction r for this width/seed (best checkpoint already loaded)
-                rs = np.concatenate([reconstruct_subject(best, s['eeg'], device)[2] for s in subj_v1])
-                rows.append({'width': w, 'seed': sd, 'best_val_r': best_val_r,
-                             'val_mean_r': float(np.nanmean(rs)), 'stopped_epoch': ep})
-                print(f"  width={w} seed={sd}: best_val_r={best_val_r:.4f} "
-                      f"recon_mean_r={rows[-1]['val_mean_r']:.4f} (stopped @ epoch {ep})")
-        ab = pd.DataFrame(rows)
-        ab.to_csv(os.path.join(OUTPUT_DIR, 'ablation_results.csv'), index=False)
-
-        agg = ab.groupby('width')['val_mean_r'].agg(['mean', 'std', 'count'])
-        means = agg['mean'].values
-        sem = (agg['std'] / np.sqrt(agg['count'])).fillna(0).values
-        los, his = means - 1.96 * sem, means + 1.96 * sem
-        knee_width, _ = find_knee(ABLATION_WIDTHS, means)
-        plot_ablation(ABLATION_WIDTHS, means, los, his, knee_width,
-                      os.path.join(OUTPUT_DIR, 'ablation_knee.png'))
-        ablation_summary = {'widths': ABLATION_WIDTHS, 'mean_r': means.tolist(),
-                            'ci95_low': los.tolist(), 'ci95_high': his.tolist(),
-                            'knee_width': int(knee_width), 'n_seeds': len(ABLATION_SEEDS)}
-        save_json(ablation_summary, os.path.join(OUTPUT_DIR, 'ablation_summary.json'))
-        chosen_width = int(knee_width)
-        print(f"  -> knee at latent width = {knee_width}")
-    else:
-        chosen_width = SELECTED_LATENT_DIM
-        print(f"\nAblation skipped (RUN_ABLATION=False); "
-              f"training final model at SELECTED_LATENT_DIM = {chosen_width}")
-
+    chosen_width = SELECTED_LATENT_DIM
     print(f"\nFinal model latent width = {chosen_width}")
 
     # ---- decoder schedule: sweep-and-pick (testing) OR use the selected one ----
@@ -1434,8 +1242,6 @@ def main():
         means = agg['mean'].values
         sems = (agg['std'] / np.sqrt(agg['count'])).fillna(0).values
         best_idx = int(np.nanargmax(means))
-        plot_decoder_sweep(labels, means, sems, best_idx,
-                           os.path.join(OUTPUT_DIR, 'decoder_sweep.png'))
         decoder_sweep_summary = {'labels': labels, 'mean_r': means.tolist(),
                                  'sem': sems.tolist(), 'best': labels[best_idx],
                                  'n_seeds': len(DECODER_SWEEP_SEEDS)}
@@ -1469,9 +1275,6 @@ def main():
         means = agg['mean'].values
         sems = (agg['std'] / np.sqrt(agg['count'])).fillna(0).values
         full_idx = COMPONENT_VARIANTS.index('full') if 'full' in COMPONENT_VARIANTS else 0
-        plot_decoder_sweep(COMPONENT_VARIANTS, means, sems, full_idx,           # highlight the control
-                           os.path.join(OUTPUT_DIR, 'component_ablation.png'),
-                           title='Component ablation (val1); control = full')
         component_summary = {'variants': COMPONENT_VARIANTS, 'mean_r': means.tolist(),
                              'sem': sems.tolist(), 'n_seeds': len(COMPONENT_SEEDS),
                              'note': 'reporting ablation; final model uses SELECTED_VARIANT'}
@@ -1499,7 +1302,7 @@ def main():
                            'pooled_leakage': pooled_leak,
                            'final_val_r': best_val_r}
         save_json(final_summaries, os.path.join(OUTPUT_DIR, 'validation_summary.json'))
-        write_paper_summary(final_summaries, ablation_summary, manifest,
+        write_paper_summary(final_summaries, manifest,
                             os.path.join(OUTPUT_DIR, 'paper_validation_summary.md'))
 
     print(f"\nDone. All outputs in {OUTPUT_DIR}")
@@ -1550,7 +1353,7 @@ def build_ablation_table_md(comp, params=None):
     return out
 
 
-def write_paper_summary(fs, ab, manifest, path):
+def write_paper_summary(fs, manifest, path):
     def fmt(d): return f"{d['mean']:.3f} (95% CI {d['ci95_low']:.3f}-{d['ci95_high']:.3f})"
 
     out_dir = os.path.dirname(path)
@@ -1566,7 +1369,6 @@ def write_paper_summary(fs, ab, manifest, path):
 
     # pull in ablation summaries written by this run OR earlier runs, so one document
     # consolidates everything regardless of which toggles fired this invocation
-    lat  = ab or _load('ablation_summary.json')
     dec  = _load('decoder_sweep_summary.json')
     comp = _load('component_ablation_summary.json')
 
@@ -1582,11 +1384,6 @@ def write_paper_summary(fs, ab, manifest, path):
              f"- Splits: train={int((manifest.split=='train').sum())}, "
              f"val1={int((manifest.split=='val1').sum())}, val2={int((manifest.split=='val2').sum())}\n"]
 
-    if lat:
-        lines += ["## Latent-width ablation\n",
-                  f"- Widths tested: {lat['widths']} ({lat['n_seeds']} seeds each)",
-                  f"- Mean val r by width: " +
-                  ", ".join(f"{w}:{r:.3f}" for w, r in zip(lat['widths'], lat['mean_r'])) + "\n"]
     if dec:
         lines += ["## Decoder-schedule ablation\n",
                   f"- Schedules ({dec['n_seeds']} seeds each): " +

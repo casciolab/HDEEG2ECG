@@ -30,16 +30,12 @@ import json
 import numpy as np
 import pandas as pd
 from scipy import stats as sps
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 # ---- config (match the main pipeline) ----
 OUTPUT_DIR     = os.environ.get('HDEEG2ECG_OUTPUT_DIR', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'outputs'))
 EQUIV_MARGIN_R = 0.05
 N_BOOTSTRAP    = 5000
 RANDOM_SEED    = 42
-COHORT_COLORS  = {'TD': 'slategray', 'ASD': 'crimson'}
 
 # The cohort column inherited from per_subject_metrics_val*.csv was written by the
 # deployed run, which used the old hardcoded TD_IDS list and mislabels subjects.
@@ -159,58 +155,6 @@ def perf_descriptives(df):
 # ============================================================
 # FIGURES (pooled)
 # ============================================================
-def _save(path):
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-    plt.savefig(path.replace('.png', '.pdf'))
-    plt.close()
-
-
-def fig_f1_vs_leakage(df, path):
-    plt.figure(figsize=(5.5, 4))
-    for coh in ['TD', 'ASD']:
-        d = df[df.cohort == coh]
-        plt.scatter(d.eeg_leakage, d.f1, s=45, alpha=0.8,
-                    color=COHORT_COLORS[coh], label=coh, edgecolor='white', linewidth=0.5)
-    plt.xlabel('EEG cardiac leakage  (R-peak-triggered peak-to-peak, a.u.)')
-    plt.ylabel('R-peak detection F1')
-    plt.ylim(-0.03, 1.03)
-    plt.title('Reconstruction quality vs leakage (val1 + val2 pooled)')
-    plt.legend(frameon=False, loc='lower right')
-    _save(path)
-
-
-def fig_se_ppv(df, path):
-    plt.figure(figsize=(5, 5))
-    for coh in ['TD', 'ASD']:
-        d = df[df.cohort == coh]
-        plt.scatter(d.sensitivity, d.ppv, s=45, alpha=0.8,
-                    color=COHORT_COLORS[coh], label=f'{coh} (n={len(d)})',
-                    edgecolor='white', linewidth=0.5)
-    plt.plot([0, 1], [0, 1], ls=':', color='grey', lw=0.8)
-    plt.xlim(-0.03, 1.03); plt.ylim(-0.03, 1.03)
-    plt.xlabel('Sensitivity (recall)')
-    plt.ylabel('PPV (precision)')
-    plt.title('Per-subject R-peak detection (val1 + val2 pooled)')
-    plt.legend(frameon=False, loc='lower left')
-    _save(path)
-
-
-def fig_f1_distribution(df, path):
-    d = df.sort_values('f1', ascending=True, na_position='first').reset_index(drop=True)
-    colors = [COHORT_COLORS.get(c, 'grey') for c in d.cohort]
-    plt.figure(figsize=(6, max(3, 0.26 * len(d))))
-    plt.hlines(range(len(d)), 0, d.f1.fillna(0), color='lightgrey', lw=1)
-    plt.scatter(d.f1, range(len(d)), color=colors, s=35, zorder=3)
-    plt.yticks(range(len(d)), d.file, fontsize=6)
-    plt.xlim(-0.03, 1.03)
-    plt.xlabel('R-peak detection F1')
-    plt.title('Per-subject F1, sorted (val1 + val2 pooled)')
-    handles = [plt.Line2D([], [], marker='o', ls='', color=COHORT_COLORS[c], label=c) for c in ['TD', 'ASD']]
-    plt.legend(handles=handles, frameon=False, loc='lower right')
-    _save(path)
-
-
 # ============================================================
 # REPORT
 # ============================================================
@@ -282,10 +226,7 @@ def main():
     with open(os.path.join(OUTPUT_DIR, 'pooled_analyses.md'), 'w') as f:
         f.write(report)
 
-    fig_f1_vs_leakage(pooled, os.path.join(OUTPUT_DIR, 'f1_vs_leakage_pooled.png'))
-    fig_se_ppv(pooled, os.path.join(OUTPUT_DIR, 'se_ppv_scatter_pooled.png'))
-    fig_f1_distribution(pooled, os.path.join(OUTPUT_DIR, 'f1_distribution_pooled.png'))
-    print(f"Wrote pooled CSV, JSON, MD, and 3 figures to {OUTPUT_DIR}")
+    print(f"Wrote pooled CSV, JSON and MD to {OUTPUT_DIR}")
 
 
 if __name__ == '__main__':
