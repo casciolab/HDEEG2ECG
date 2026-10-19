@@ -2,8 +2,8 @@
 
 Code, trained weights and toolbox for
 
-> Fraile-Vazquez, M. E. *et al.* HDEEG2ECG: Electrocardiogram reconstruction from raw
-> high-density electroencephalography data. (submitted)
+> Fraile-Vazquez, M. E. *et al.* Heartbeat signal recovered from high-density EEG enables
+> brain-body neural marker analysis (submitted)
 
 A dilated convolutional network reconstructs the ECG from 128-channel EEG. A reference-free
 quality-control gate then decides, from the timing of the reconstructed R-peaks alone, whether
