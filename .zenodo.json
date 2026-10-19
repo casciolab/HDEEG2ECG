@@ -1,7 +1,7 @@
 {
-  "title": "HDEEG2ECG: ECG reconstruction from high-density EEG, with a reference-free quality-control toolbox",
+  "title": "Heartbeat signal recovered from high-density EEG enables brain-body neural marker analysis",
   "upload_type": "software",
-  "description": "Model code, trained weights, the three-stage inference and quality-control toolbox, and the analysis code for Fraile-Vazquez et al., 'HDEEG2ECG: Electrocardiogram reconstruction from raw high-density electroencephalography data'. No recordings are included.",
+  "description": "Model code, trained weights, the three-stage inference and quality-control toolbox, and the analysis code for Fraile-Vazquez et al., 'Heartbeat signal recovered from high-density EEG enables brain-body neural marker analysis'. No recordings are included.",
   "creators": [
     {"name": "Fraile-Vazquez, Matias E.", "affiliation": "Life Span Institute, University of Kansas"}
   ],

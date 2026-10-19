@@ -10,7 +10,7 @@ authors:
     affiliation: "Life Span Institute, University of Kansas"
 preferred-citation:
   type: article
-  title: "HDEEG2ECG: Electrocardiogram reconstruction from raw high-density electroencephalography data"
+  title: "Heartbeat signal recovered from high-density EEG enables brain-body neural marker analysis"
   status: submitted
   authors:
     - family-names: Fraile-Vazquez
